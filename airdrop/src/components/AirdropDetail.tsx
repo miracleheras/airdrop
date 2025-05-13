@@ -10,6 +10,11 @@ import BN from "bn.js";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { getAirdropType, getBNValue, getRecipientProgress, getTokenProgress } from "../utils/airdrop";
 
+type ClaimantData = {
+  amountUnlocked: number;
+  amountLocked: number;
+  proof: number[][];
+};
 
 export const AirdropDetail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -26,7 +31,7 @@ export const AirdropDetail: React.FC = () => {
 
   const [isClaimable, setIsClaimable] = useState<boolean>(false);
   const [userClaimableAmount, setUserClaimableAmount] = useState<number>(0);
-  const [claimantData, setClaimantData] = useState<any>(null);
+  const [claimantData, setClaimantData] = useState<ClaimantData | null>(null);
   
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet();
 

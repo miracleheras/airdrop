@@ -1,34 +1,38 @@
-export const getBNValue = (bnValue: any): number => {
+import BN from 'bn.js';
+
+type DistributorDetails = {
+  numNodesClaimed: BN;
+  maxNumNodes: BN;
+  totalAmountClaimed: BN;
+  maxTotalClaim: BN;
+  unlockPeriod: BN;
+  startTs: BN;
+  clawedBack: boolean;
+};
+
+export const getBNValue = (bnValue: BN | null | undefined): number => {
   if (!bnValue) return 0;
   
   try {
-    if (typeof bnValue.toString === 'function') {
-      return parseInt(bnValue.toString());
-    }
-    
-    if (bnValue.words && Array.isArray(bnValue.words)) {
-      return bnValue.words[0] || 0;
-    }
-    
-    return 0;
+    return parseInt(bnValue.toString());
   } catch (e) {
     console.error("Error parsing BN value:", e);
     return 0;
   }
 };
 
-export const formatTokenAmount = (bnValue: any, decimals: number = 6): string => {
+export const formatTokenAmount = (bnValue: BN | null | undefined, decimals: number = 6): string => {
   const value = getBNValue(bnValue);
   return (value / Math.pow(10, decimals)).toFixed(2);
 };
 
-export const getAirdropType = (unlockPeriod: any): string => {
+export const getAirdropType = (unlockPeriod: BN | null | undefined): string => {
   if (!unlockPeriod) return "Unknown";
   const period = getBNValue(unlockPeriod);
   return period === 1 ? "Instant" : "Vested";
 };
 
-export const getRecipientProgress = (distributorDetails: any): { claimed: number, total: number, percentage: string } => {
+export const getRecipientProgress = (distributorDetails: DistributorDetails | null): { claimed: number, total: number, percentage: string } => {
   if (!distributorDetails) return { claimed: 0, total: 0, percentage: "0%" };
   
   const claimed = getBNValue(distributorDetails.numNodesClaimed);
@@ -38,7 +42,7 @@ export const getRecipientProgress = (distributorDetails: any): { claimed: number
   return { claimed, total, percentage };
 };
 
-export const getTokenProgress = (distributorDetails: any): { claimed: string, total: string, percentage: string } => {
+export const getTokenProgress = (distributorDetails: DistributorDetails | null): { claimed: string, total: string, percentage: string } => {
   if (!distributorDetails) return { claimed: "0", total: "0", percentage: "0%" };
   
   const claimed = getBNValue(distributorDetails.totalAmountClaimed);

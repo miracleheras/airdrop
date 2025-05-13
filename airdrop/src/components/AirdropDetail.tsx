@@ -7,6 +7,8 @@ import { ICluster } from "@streamflow/stream";
 import { SOLANA_CLUSTER_URL, API_BASE_URL } from "../consts";
 import { useWallet } from '@solana/wallet-adapter-react'
 import BN from "bn.js";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { getAirdropType, getBNValue, getRecipientProgress, getTokenProgress } from "../utils/airdrop";
 
 
 export const AirdropDetail: React.FC = () => {
@@ -33,6 +35,8 @@ export const AirdropDetail: React.FC = () => {
     cluster: ICluster.Devnet,
   });
 
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
     if (address && airdrops.length > 0) {
@@ -116,72 +120,25 @@ export const AirdropDetail: React.FC = () => {
     checkClaimStatus();
   }, [address, publicKey, distributorClient]);
   
-  
 
-  const getBNValue = (bnValue: any): number => {
-    if (!bnValue) return 0;
-    
-    try {
-      if (typeof bnValue.toString === 'function') {
-        return parseInt(bnValue.toString());
-      }
-      
-      if (bnValue.words && Array.isArray(bnValue.words)) {
-        return bnValue.words[0] || 0;
-      }
-      
-      return 0;
-    } catch (e) {
-      console.error("Error parsing BN value:", e);
-      return 0;
+  const recipients = getRecipientProgress(distributorDetails);
+  const tokens = getTokenProgress(distributorDetails);
+
+  const handleClaimClick = () => {
+    if (!connected || !publicKey || !address || !isClaimable) {
+      return;
     }
+    setShowConfirmDialog(true);
   };
 
-  const formatTokenAmount = (bnValue: any, decimals: number = 6): string => {
-    const value = getBNValue(bnValue);
-    return (value / Math.pow(10, decimals)).toFixed(2);
-  };
-  
-  const getAirdropType = (): string => {
-    if (!distributorDetails?.unlockPeriod) return "Unknown";
-    const unlockPeriod = getBNValue(distributorDetails.unlockPeriod);
-    return unlockPeriod === 1 ? "Instant" : "Vested";
-  };
-  
-  const getRecipientProgress = (): { claimed: number, total: number, percentage: string } => {
-    if (!distributorDetails) return { claimed: 0, total: 0, percentage: "0%" };
-    
-    const claimed = getBNValue(distributorDetails.numNodesClaimed);
-    const total = getBNValue(distributorDetails.maxNumNodes);
-    const percentage = total > 0 ? `${(claimed / total * 100).toFixed(2)}%` : "0%";
-    
-    return { claimed, total, percentage };
-  };
-  
-  const getTokenProgress = (): { claimed: string, total: string, percentage: string } => {
-    if (!distributorDetails) return { claimed: "0", total: "0", percentage: "0%" };
-    
-    const claimed = getBNValue(distributorDetails.totalAmountClaimed);
-    const total = getBNValue(distributorDetails.maxTotalClaim);
-    const percentage = total > 0 ? `${(claimed / total * 100).toFixed(2)}%` : "0%";
-    
-    return {
-      claimed: formatTokenAmount(distributorDetails.totalAmountClaimed),
-      total: formatTokenAmount(distributorDetails.maxTotalClaim),
-      percentage
-    };
-  };
-
-  const recipients = getRecipientProgress();
-  const tokens = getTokenProgress();
-
-  const handleClaim = async () => {
+  const handleConfirmClaim = async () => {
     if (!connected || !publicKey || !address) {
       console.error("Wallet not connected or airdrop address missing");
       return;
     }
 
     try {
+      setIsClaiming(true);
       if (!claimantData) {
         alert("No claimable tokens found for your wallet");
         return;
@@ -212,10 +169,11 @@ export const AirdropDetail: React.FC = () => {
       });
 
       setIsClaimable(false);
+      setShowConfirmDialog(false);
 
       console.log("Claim result:", claimResult);
       
-      alert("Claim initiated, please refresh the page to see the updated claim status");
+      alert("Claim initiated, please see the console for the transaction details");
     } catch (error: any) {
       console.error("Error claiming airdrop:", error);
       let errorMessage = "Unknown error";
@@ -229,6 +187,8 @@ export const AirdropDetail: React.FC = () => {
       }
       
       alert(`Failed to claim airdrop: ${errorMessage}`);
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -287,8 +247,8 @@ export const AirdropDetail: React.FC = () => {
               <div>
                 <h1 className="text-3xl font-bold text-white">{airdrop.name}</h1>
                 <div className="flex items-center mt-1 gap-2">
-                  <span className={`px-2 py-1 text-sm rounded-full ${getAirdropType() === 'Instant' ? 'bg-green-500/20 text-green-300' : 'bg-blue-500/20 text-blue-300'}`}>
-                    {getAirdropType()} Airdrop
+                  <span className={`px-2 py-1 text-sm rounded-full ${getAirdropType(distributorDetails.unlockPeriod) === 'Instant' ? 'bg-green-500/20 text-green-300' : 'bg-blue-500/20 text-blue-300'}`}>
+                    {getAirdropType(distributorDetails.unlockPeriod)} Airdrop
                   </span>
                 </div>
               </div>
@@ -407,30 +367,48 @@ export const AirdropDetail: React.FC = () => {
             <div className="flex justify-center mt-8">
               <button 
                 className={`
-                  bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-8 rounded-lg 
+                  bg-[#00F5A0]/90 hover:bg-[#00D48F]/90 text-[#0A0F1C] font-medium py-3 px-8 rounded-lg 
                   transition-all duration-200 flex items-center justify-center gap-2 
-                  shadow-lg hover:shadow-indigo-500/20
-                  ${!connected || !isClaimable ? 'opacity-50 cursor-not-allowed' : ''}
+                  shadow-lg hover:shadow-[#00F5A0]/10
+                  ${(!connected || !isClaimable || isClaiming) ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
-                disabled={!connected || !isClaimable}
-                onClick={handleClaim}
+                disabled={!connected || !isClaimable || isClaiming}
+                onClick={handleClaimClick}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>
-                  {!connected
-                    ? 'Connect Wallet to Claim'
-                    : !isClaimable
-                      ? 'Nothing to Claim'
-                      : 'Claim Airdrop'
-                  }
-                </span>
+                {isClaiming ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#0A0F1C]"></div>
+                    <span>Claiming...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>
+                      {!connected
+                        ? 'Connect Wallet to Claim'
+                        : !isClaimable
+                          ? 'Nothing to Claim'
+                          : 'Claim Airdrop'
+                      }
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmClaim}
+        amount={userClaimableAmount}
+        tokenName={airdrop?.name || 'tokens'}
+        isLoading={isClaiming}
+      />
     </div>
   );
 };
